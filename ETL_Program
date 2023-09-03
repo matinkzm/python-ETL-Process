@@ -1,0 +1,79 @@
+import glob
+import pandas as pd
+from datetime import datetime
+
+
+def read_from_json(file_to_process):        # read a json file and transform it to dataframe
+    dataframe = pd.read_json(file_to_process)
+    return dataframe
+
+
+def find_json():                            # find json file with name
+    for json_file in glob.glob('bank_market_cap_1.json'):
+        returned_dataframe = read_from_json(json_file)
+    temp_dataframe = pd.DataFrame(returned_dataframe, columns=['Name', 'Market Cap (US$ Billion)'])
+    return temp_dataframe
+
+
+def read_from_csv(file_to_process):          # read a csv file and transform it to dataframe
+    data = pd.read_csv(file_to_process)
+    return data
+
+
+def find_in_dataframe(keyword, dataframe):         # find a keyword in a dataframe
+    temp_dataframe = pd.DataFrame(columns=['symbols', 'Rates'])
+    place = dataframe.loc[dataframe['symbols'] == keyword]
+    temp_dataframe = pd.concat([temp_dataframe, place])
+    ex_rate = temp_dataframe.iloc[0]['Rates']
+    return ex_rate
+
+
+def transform(rate, dataframe):                    # trasform it the way that project need it
+    USD = find_in_dataframe('USD', dataframe)
+    USD2GBP = USD / rate
+
+    usd_dataframe = read_from_json('bank_market_cap_1.json')
+    print(usd_dataframe.head())
+    usd_dataframe.loc[:, "Market Cap (GBP$ Billion)"] = round(usd_dataframe.iloc[:, 1] / USD2GBP, 3)
+    gbp_dataframe = usd_dataframe.drop("Market Cap (US$ Billion)", axis=1)
+    return gbp_dataframe
+
+
+def load_to_csv(dataframe):                        # load dataframes into a csv file
+    target_file = 'bank_market_cap_gbp.csv'
+    temp_dataframe = pd.DataFrame(dataframe)
+    temp_dataframe.to_csv(target_file)
+
+
+def log(message):                                  # create a log message and write it in a log file
+    date_format = "%Y/%h/%d %H:%M:%S"
+    now_time = datetime.now()
+    log_time = now_time.strftime(date_format)
+    with open('log.txt','a') as f:
+        f.write(message + " at " + log_time + '\n')
+
+
+def etl_process():                                  # main program
+    log("ETL job started")
+
+    log("extract phase started")
+    returned_dataframe = read_from_csv('exchange_rates.csv')
+    # print(returned_dataframe.head())
+    log("extract phase ended")
+
+    log("transform phase started")
+    exchange_rate = find_in_dataframe("GBP", returned_dataframe)
+    # print(exchange_rate)
+    new_gbp_dataframe = transform(exchange_rate, returned_dataframe)
+    # print(new_gbp_dataframe.head())
+    log("transform phase ended")
+
+    log("load phase started")
+    load_to_csv(new_gbp_dataframe)
+    log("load phase ended")
+
+    log("ETL finished")
+
+
+etl_process()
+
